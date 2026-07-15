@@ -177,3 +177,68 @@ Audit Logging & Secure Session Management
 ```
 
 SmartPass Pro's workflow combines secure authentication, role-based authorization, cloud-backed persistence, QR-enabled verification, real-time communication, and comprehensive audit logging into a unified digital ecosystem. The result is a production-ready platform that replaces manual gate pass processes with a secure, scalable, transparent, and efficient solution for modern educational institutions.
+| Module           | Features                                                                       |
+| ---------------- | ------------------------------------------------------------------------------ |
+| Authentication   | Email Login, Google OAuth, JWT Authentication, Refresh Tokens, Secure Sessions |
+| Student Portal   | Create Requests, Track Status, View History, Profile Management                |
+| Teacher Portal   | Create Student Passes, Review Requests, Real-Time Updates                      |
+| Principal Portal | Approve/Reject Requests, Monitor Activity, Dashboard Analytics                 |
+| Guard Portal     | QR Scanner, OTP Verification, Entry/Exit Validation                            |
+| Admin Portal     | User Management, Role Management, Audit Monitoring, System Configuration       |
+| Security         | RBAC, Helmet, Rate Limiting, Password Hashing, Input Validation                |
+| Communication    | Socket.IO Real-Time Synchronization                                            |
+| Notification     | Email Notifications, OTP Verification                                          |
+| Reports          | Pass History, Audit Logs, User Activity                                        |
+=====================================================================================================
+| Technology        | Purpose                 |
+| ----------------- | ----------------------- |
+| HTML5             | Structure               |
+| CSS3              | Responsive UI           |
+| JavaScript (ES6+) | Client Logic            |
+| Socket.IO Client  | Real-Time Communication |
+==============================================
+| Technology   | Purpose             |
+| ------------ | ------------------- |
+| Node.js      | Runtime Environment |
+| Express.js   | REST API Framework  |
+| Socket.IO    | Real-Time Events    |
+| JWT          | Authentication      |
+| Google OAuth | Social Login        |
+| Technology | Purpose                  |
+| ---------- | ------------------------ |
+| PostgreSQL | Relational Database      |
+| Neon       | Managed Cloud PostgreSQL |
+| Technology         | Purpose                |
+| ------------------ | ---------------------- |
+| Helmet             | HTTP Security Headers  |
+| express-rate-limit | Brute Force Protection |
+| Joi                | Request Validation     |
+| bcrypt             | Password Hashing       |
+| JWT                | Secure Authentication  |
+| Table          | Description             |
+| -------------- | ----------------------- |
+| users          | User Accounts           |
+| roles          | System Roles            |
+| gate_passes    | Pass Information        |
+| refresh_tokens | Authentication Sessions |
+| otp_logs       | OTP Records             |
+| audit_logs     | Security Events         |
+| notifications  | Email Notifications     |
+=============================================================
+| Security Control     | Description                        |
+| -------------------- | ---------------------------------- |
+| JWT Authentication   | Secure access tokens               |
+| Refresh Tokens       | Long-lived session management      |
+| Google OAuth         | Trusted third-party authentication |
+| bcrypt               | Password hashing                   |
+| Helmet               | Secure HTTP headers                |
+| Rate Limiting        | Prevent brute-force attacks        |
+| RBAC                 | Role-based permissions             |
+| Joi Validation       | Request validation                 |
+| SQL Parameterization | Prevent SQL Injection              |
+| CORS Protection      | Cross-origin access control        |
+| Secure Cookies       | Token protection                   |
+| Audit Logs           | Complete activity tracking         |
+| OTP Verification     | Additional verification layer      |
+| QR Validation        | Prevent duplicate pass usage       |
+=============================================================
