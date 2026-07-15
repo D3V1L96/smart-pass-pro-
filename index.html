@@ -1,0 +1,2105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SmartPass Pro | Enterprise Gate Pass Management</title>
+  <script src="https://cdn.jsdelivr.net/npm/socket.io-client@4.7.5/dist/socket.io.min.js"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script>
+    if (typeof io === 'undefined') {
+      document.write('<script src="https:\/\/cdn.socket.io\/4.7.4\/socket.io.min.js"><\/script>');
+    }
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+  <style>
+    :root {
+      --bg:#0a0f1c; --bg2:#111827;
+      --glass:rgba(15,23,42,0.85);
+      --border:rgba(255,255,255,0.1);
+      --text:#e2e8f0;
+      --muted:#94a3b8;
+      --accent:#6366f1; --accent2:#818cf8;
+      --success:#22c55e; --warning:#f59e0b; --error:#ef4444;
+      --radius:18px; --radius-sm:12px;
+    }
+    body.light {
+      --bg:#f0f4ff; --bg2:#e2e8f0;
+      --glass:rgba(255,255,255,0.88);
+      --border:rgba(0,0,0,0.1);
+      --text:#111827; --muted:#475569;
+    }
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{
+      background:linear-gradient(135deg,var(--bg),var(--bg2));
+      color:var(--text); font-family:'Segoe UI',system-ui,sans-serif;
+      min-height:100vh; transition:background .35s,color .35s;
+    }
+    .glass{
+      background:var(--glass); backdrop-filter:blur(28px);
+      border:1px solid var(--border); border-radius:var(--radius);
+      box-shadow:0 16px 52px rgba(0,0,0,.55);
+    }
+    .field{
+      width:100%; padding:15px 18px; margin:9px 0;
+      border-radius:var(--radius-sm); border:1px solid var(--border);
+      background:rgba(255,255,255,.07); color:var(--text);
+      font-size:.98rem; outline:none; transition:border .2s;
+    }
+    .field:focus{border-color:var(--accent);}
+    .btn{
+      padding:14px 24px; border:none; border-radius:var(--radius-sm);
+      font-weight:600; font-size:.97rem; cursor:pointer;
+      transition:all .32s cubic-bezier(.4,0,.2,1);
+      width:100%; margin:7px 0; display:block;
+    }
+    .btn:hover{transform:translateY(-3px); box-shadow:0 10px 26px rgba(99,102,241,.35);}
+    .btn-primary{background:linear-gradient(135deg,#6366f1,#4f52e0); color:#fff;}
+    .btn-danger{background:#ef4444; color:#fff;}
+    .btn-ghost{background:rgba(255,255,255,.07); color:var(--text); border:1px solid var(--border);}
+    .btn-ghost:hover{background:rgba(255,255,255,.13);}
+    .btn-nav{text-align:left; background:rgba(255,255,255,.06); color:var(--text); border-radius:var(--radius-sm);}
+    .btn-nav:hover{background:rgba(255,255,255,.12); transform:none; box-shadow:none;}
+    .btn-nav.active{background:rgba(99,102,241,.22); color:var(--accent2); border-left:3px solid var(--accent);}
+    #toastBox{
+      position:fixed; top:24px; right:24px;
+      display:flex; flex-direction:column; gap:10px;
+      z-index:9999; pointer-events:none;
+    }
+    .toast{
+      display:flex; align-items:center; gap:12px;
+      padding:13px 20px; border-radius:var(--radius-sm);
+      background:var(--glass); backdrop-filter:blur(20px);
+      border:1px solid var(--border); box-shadow:0 10px 30px rgba(0,0,0,.5);
+      font-size:.92rem; font-weight:500; color:var(--text);
+      transform:translateX(120%); opacity:0;
+      transition:transform .35s cubic-bezier(.22,.68,0,1.2),opacity .35s;
+      pointer-events:auto; min-width:230px; max-width:340px;
+    }
+    .toast.show{transform:translateX(0); opacity:1;}
+    #connBadge{
+      position:fixed; bottom:18px; right:18px; z-index:9998;
+      padding:7px 15px; border-radius:50px;
+      background:var(--glass); backdrop-filter:blur(12px);
+      border:1px solid var(--border); font-size:.8rem; font-weight:600;
+      display:flex; align-items:center; gap:7px; pointer-events:none;
+    }
+    .dot{width:8px;height:8px;border-radius:50%;}
+    .dot.on{background:var(--success); box-shadow:0 0 7px var(--success);}
+    .dot.off{background:var(--error); box-shadow:0 0 7px var(--error);}
+    .modal{
+      display:none; position:fixed; inset:0;
+      background:rgba(0,0,0,.78); backdrop-filter:blur(7px);
+      align-items:center; justify-content:center; z-index:8000;
+    }
+    .modal.open{display:flex;}
+    .modal-box{
+      padding:38px 34px; max-width:430px; width:92%;
+      text-align:center;
+    }
+    .modal-box h2{margin-bottom:8px; font-size:1.5rem;}
+    .modal-box p{color:var(--muted); margin-bottom:20px; font-size:.93rem;}
+    #pageLanding{
+      min-height:100vh; display:flex; flex-direction:column;
+      align-items:center; justify-content:center; padding:36px 20px;
+    }
+    .landing-title{
+      font-size:clamp(2.4rem,5vw,3.6rem); font-weight:800;
+      background:linear-gradient(135deg,#6366f1,#a78bfa,#38bdf8);
+      -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+      background-clip:text; text-align:center;
+    }
+    .portal-grid{
+      display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr));
+      gap:22px; width:100%; max-width:960px; margin-top:48px;
+    }
+    .portal-card{
+      padding:40px 32px; text-align:center; cursor:pointer;
+      transition:all .4s cubic-bezier(.4,0,.2,1); position:relative;
+      overflow:hidden;
+      border: 1px solid var(--border);
+    }
+    .portal-card:hover {
+      transform: translateY(-8px) scale(1.02);
+      box-shadow: 0 20px 60px rgba(99,102,241,0.25);
+    }
+    .portal-card::before{
+      content:''; position:absolute; inset:0;
+      border-radius:var(--radius); opacity:0;
+      transition:opacity .4s;
+    }
+    .portal-card:hover{transform:translateY(-14px) scale(1.04);}
+    .portal-card:hover::before{opacity:1;}
+    .portal-card[data-role="teacher"]{border-top:3px solid #6366f1;}
+    .portal-card[data-role="teacher"]::before{background:radial-gradient(circle at 50% 0%, rgba(99,102,241,.18), transparent 70%);}
+    .portal-card[data-role="student"]{border-top:3px solid #3b82f6;}
+    .portal-card[data-role="student"]::before{background:radial-gradient(circle at 50% 0%, rgba(59,130,246,.18), transparent 70%);}
+    .portal-card[data-role="guard"]{border-top:3px solid #22c55e;}
+    .portal-card[data-role="guard"]::before{background:radial-gradient(circle at 50% 0%, rgba(34,197,94,.18), transparent 70%);}
+    .portal-card[data-role="principal"]{border-top:3px solid #a855f7;}
+    .portal-card[data-role="principal"]::before{background:radial-gradient(circle at 50% 0%, rgba(168,85,247,.18), transparent 70%);}
+    .portal-card[data-role="admin"]{border-top:3px solid #f59e0b;}
+    .portal-card[data-role="admin"]::before{background:radial-gradient(circle at 50% 0%, rgba(245,158,11,.18), transparent 70%);}
+    .portal-icon{font-size:3rem; margin-bottom:18px; display:block; line-height:1;}
+    .portal-card h3{font-size:1.35rem; margin-bottom:10px;}
+    .portal-card p{color:var(--muted); font-size:.88rem; line-height:1.55;}
+    #pageAuth{
+      display:none; min-height:100vh;
+      align-items:center; justify-content:center; padding:20px;
+    }
+    #pageAuth.open{display:flex;}
+    .auth-box{width:100%; max-width:440px; padding:46px 38px;}
+    .auth-box h1{font-size:2rem; font-weight:700; text-align:center; margin-bottom:4px;}
+    .auth-subtitle{text-align:center; color:var(--muted); margin-bottom:26px; font-size:.9rem;}
+    #pageDash{display:none; min-height:100vh;}
+    #pageDash.open{display:block;}
+    .menu-btn{
+      position:fixed; top:20px; left:20px; z-index:1100;
+      width:54px; height:54px; border-radius:50%;
+      background:var(--glass); backdrop-filter:blur(12px);
+      border:1px solid var(--border); font-size:22px; cursor:pointer;
+      display:flex; align-items:center; justify-content:center;
+      box-shadow:0 8px 24px rgba(0,0,0,.4); transition:transform .2s;
+    }
+    .menu-btn:hover{transform:scale(1.08);}
+    .sidebar{
+      position:fixed; left:-340px; top:0; width:310px; height:100%;
+      padding:34px 22px; transition:.45s cubic-bezier(.32,.72,0,1);
+      z-index:1000; overflow-y:auto;
+      background:rgba(8,12,24,.97); border-right:1px solid var(--border);
+    }
+    .sidebar.open{left:0;}
+    .sb-overlay{
+      position:fixed; inset:0; background:rgba(0,0,0,.5);
+      z-index:999; display:none;
+    }
+    .sb-overlay.open{display:block;}
+    .main{padding:88px 34px 40px;}
+    .page-title{font-size:2.1rem; font-weight:700; margin-bottom:32px;}
+    .stats-grid{
+      display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr));
+      gap:20px; margin-bottom:32px;
+    }
+    .stat-card{
+      padding:26px 22px; text-align:center; transition:transform .35s;
+    }
+    .stat-card:hover{transform:translateY(-10px);}
+    .stat-card .label{font-size:.82rem; text-transform:uppercase;
+      letter-spacing:1px; color:var(--muted); margin-bottom:10px;}
+    .stat-card .value{font-size:2.3rem; font-weight:700; line-height:1;}
+    .table-wrap{overflow-x:auto;}
+    table{width:100%; border-collapse:collapse;}
+    th{
+      padding:16px 15px; background:rgba(255,255,255,.05);
+      text-align:left; font-size:.82rem; color:var(--muted);
+      text-transform:uppercase; letter-spacing:.8px; white-space:nowrap;
+    }
+    td{padding:18px 15px; border-top:1px solid rgba(255,255,255,.07); vertical-align:middle;}
+    tr:hover td{background:rgba(255,255,255,.04);}
+    .badge{
+      padding:5px 16px; border-radius:50px;
+      font-size:.82rem; font-weight:700; display:inline-block;
+    }
+    .form-row{display:grid; grid-template-columns:1fr 1fr; gap:16px;}
+    .pass-card{
+      padding:20px 22px; margin-bottom:12px; cursor:pointer;
+      transition:transform .28s, box-shadow .28s;
+    }
+    .pass-card:hover{transform:translateX(6px); box-shadow:0 8px 28px rgba(0,0,0,.3);}
+    .info-box{
+      padding:15px 18px; border-radius:var(--radius-sm);
+      background:rgba(99,102,241,.09); border:1px solid rgba(99,102,241,.25);
+      font-size:.88rem; color:var(--muted); line-height:1.55;
+    }
+    .info-box strong{color:var(--accent2);}
+    .p-row{
+      display:flex; justify-content:space-between; align-items:center;
+      padding:15px 18px; background:rgba(255,255,255,.04);
+      border-radius:var(--radius-sm); border:1px solid var(--border);
+      margin-bottom:10px;
+    }
+    .p-row .p-label{color:var(--muted); font-size:.88rem;}
+    .p-row .p-val{font-weight:600;}
+    .vr{margin-top:26px; padding:26px; border-radius:var(--radius); text-align:center;}
+    .vr h2{font-size:1.6rem; margin:10px 0 14px;}
+    .s-Approved{color:var(--success); background:rgba(34,197,94,.13);}
+    .s-Pending{color:var(--warning); background:rgba(245,158,11,.13);}
+    .s-Rejected{color:var(--error); background:rgba(239,68,68,.13);}
+    .s-Used{color:#94a3b8; background:rgba(148,163,184,.13);}
+    .s-Expired{color:#64748b; background:rgba(100,116,139,.13);}
+    ::-webkit-scrollbar{width:5px; height:5px;}
+    ::-webkit-scrollbar-thumb{background:rgba(99,102,241,.5); border-radius:4px;}
+    .splash {
+      position: fixed;
+      inset: 0;
+      background: linear-gradient(135deg, var(--bg), var(--bg2));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+      transition: opacity 1.2s ease-out;
+    }
+    .splash-content {
+      text-align: center;
+      animation: fadeInScale 1.5s ease-out;
+    }
+    .app-logo {
+      width: 120px;
+      height: 120px;
+      margin: 0 auto 24px;
+      background: rgba(99,102,241,0.1);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 3px solid var(--accent);
+      animation: pulse 2s infinite ease-in-out;
+    }
+    .splash-title {
+      font-size: 2.8rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, #6366f1, #a78bfa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 8px;
+    }
+    .splash-subtitle {
+      color: var(--muted);
+      font-size: 1.1rem;
+      margin-bottom: 40px;
+    }
+    .loading-bar {
+      width: 240px;
+      height: 4px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 2px;
+      margin: 0 auto;
+      overflow: hidden;
+    }
+    .loading-progress {
+      width: 0;
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      animation: loading 2.5s linear forwards;
+    }
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+    @keyframes fadeInScale {
+      from { opacity: 0; transform: scale(0.92); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    @keyframes loading {
+      to { width: 100%; }
+    }
+    .admin-badge{
+      display:inline-block; padding:3px 12px; border-radius:50px;
+      background:rgba(245,158,11,.15); color:var(--warning);
+      font-size:.72rem; font-weight:700; letter-spacing:.5px;
+      border:1px solid rgba(245,158,11,.35); text-transform:uppercase;
+    }
+    .emp-id{
+      font-family:'Courier New',monospace; font-size:.82rem;
+      color:var(--accent2); background:rgba(99,102,241,.1);
+      padding:3px 10px; border-radius:6px; letter-spacing:.5px;
+    }
+    .notice-card{
+      padding:18px 20px; border-radius:var(--radius-sm); margin-bottom:12px;
+      border-left:4px solid var(--accent); background:rgba(255,255,255,.04);
+    }
+    .notice-card.high{border-left-color:var(--error); background:rgba(239,68,68,.06);}
+    .notice-card.normal{border-left-color:var(--accent);}
+    .notice-card.low{border-left-color:var(--muted);}
+    .notice-card h4{font-size:1rem; margin-bottom:4px;}
+    .notice-card p{color:var(--muted); font-size:.87rem; line-height:1.5;}
+    .notice-card .n-meta{font-size:.76rem; color:var(--muted); margin-top:8px; opacity:.8;}
+    .role-pill{
+      padding:4px 12px; border-radius:50px; font-size:.75rem; font-weight:700;
+      text-transform:capitalize; display:inline-block;
+    }
+    .role-teacher{color:#6366f1;background:rgba(99,102,241,.13);}
+    .role-student{color:#3b82f6;background:rgba(59,130,246,.13);}
+    .role-guard{color:#22c55e;background:rgba(34,197,94,.13);}
+    .role-principal{color:#a855f7;background:rgba(168,85,247,.13);}
+    .role-admin{color:#f59e0b;background:rgba(245,158,11,.13);}
+    .mini-portal-card{
+      padding:20px; border-radius:var(--radius-sm); background:rgba(255,255,255,.04);
+      border:1px solid var(--border); text-align:center;
+    }
+    .auth-divider{
+      display:flex; align-items:center; gap:12px; margin:18px 0;
+      color:var(--muted); font-size:.8rem; text-transform:uppercase; letter-spacing:.5px;
+    }
+    .auth-divider::before,.auth-divider::after{
+      content:''; flex:1; height:1px; background:var(--border);
+    }
+    .btn-google{
+      display:flex; align-items:center; justify-content:center; gap:10px;
+      background:#fff; color:#3c4043; border:1px solid rgba(0,0,0,.12);
+    }
+    .btn-google:hover{ background:#f8f9fa; }
+    .btn-google i{ font-size:1.05rem; color:#4285F4; }
+    @media(max-width:768px){
+      .main{padding:82px 16px 32px;}
+      .form-row{grid-template-columns:1fr;}
+      .portal-grid{grid-template-columns:1fr 1fr;}
+    }
+    @media(max-width:480px){
+      .portal-grid{grid-template-columns:1fr;}
+    }
+  </style>
+</head>
+<body>
+  <div id="splashScreen" class="splash">
+    <div class="splash-content">
+      <div class="logo-container">
+        <div class="app-logo">
+          <i class="fas fa-shield-alt fa-4x" style="color: #6366f1;"></i>
+        </div>
+        <h1 class="splash-title">SmartPass Pro</h1>
+        <p class="splash-subtitle">Enterprise Gate Pass Management</p>
+        <div class="loading-bar">
+          <div class="loading-progress"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<div id="toastBox"></div>
+
+<div id="connBadge">
+  <div class="dot off" id="connDot"></div>
+  <span id="connTxt">Connecting…</span>
+</div>
+
+<div class="sb-overlay" id="sbOverlay" onclick="closeSB()"></div>
+
+<div id="pageLanding">
+  <p class="landing-title">SmartPass Pro</p>
+  <p style="color:var(--muted); margin-top:10px; font-size:1.05rem; text-align:center;">
+    Gate Pass Management — choose your portal to continue
+  </p>
+  <div class="portal-grid">
+    <div class="portal-card glass" data-role="teacher" onclick="selectPortal('teacher')">
+      <span class="portal-icon"><i class="fas fa-chalkboard-teacher fa-3x"></i></span>
+      <h3>Teacher</h3>
+      <p>Create passes, send OTPs to parents, approve & track every request</p>
+    </div>
+    <div class="portal-card glass" data-role="student" onclick="selectPortal('student')">
+      <span class="portal-icon"><i class="fas fa-user-graduate fa-3x"></i></span>
+      <h3>Student</h3>
+      <p>View your passes, track approval status, and download QR codes</p>
+    </div>
+    <div class="portal-card glass" data-role="guard" onclick="selectPortal('guard')">
+      <span class="portal-icon"><i class="fas fa-shield-alt fa-3x"></i></span>
+      <h3>Security Guard</h3>
+      <p>Verify gate passes in real time, record entries, view scan history</p>
+    </div>
+    <div class="portal-card glass" data-role="principal" onclick="selectPortal('principal')">
+      <span class="portal-icon"><i class="fas fa-user-tie fa-3x"></i></span>
+      <h3>Principal</h3>
+      <p>Full oversight — all passes, live stats, teacher & student activity</p>
+    </div>
+    <div class="portal-card glass" data-role="admin" onclick="selectPortal('admin')">
+      <span class="portal-icon"><i class="fas fa-user-shield fa-3x"></i></span>
+      <h3>Admin</h3>
+      <p>Super access — monitor every portal, manage users & employee IDs, passes and security</p>
+    </div>
+  </div>
+</div>
+
+<div id="pageAuth">
+  <div class="auth-box glass" id="authBox"></div>
+</div>
+
+<div id="pageDash">
+  <button class="menu-btn" onclick="toggleSB()">☰</button>
+
+  <div class="sidebar glass" id="sidebar">
+    <div style="text-align:center; margin-bottom:32px;">
+      <img id="sbPhoto" src="https://placehold.co/150x150/6366f1/ffffff?text=SP"
+           style="width:100px;height:100px;border-radius:50%;border:4px solid var(--border);object-fit:cover;cursor:pointer;"
+           onclick="document.getElementById('photoInput').click()">
+      <input type="file" id="photoInput" hidden accept="image/*" onchange="changePhoto(event)">
+      <h3 id="sbName" style="margin:16px 0 4px; font-size:1.1rem;"></h3>
+      <p id="sbRole" style="color:var(--accent2); font-size:.85rem; text-transform:capitalize;"></p>
+      <p id="sbEmail" style="color:var(--muted); font-size:.8rem; margin-top:2px;"></p>
+      <p id="sbEmpId" style="margin-top:8px;"></p>
+    </div>
+    <div id="sbNav"></div>
+  </div>
+
+  <div class="main">
+    <div class="page-title" id="dashTitle"></div>
+    <div id="dashContent"></div>
+  </div>
+</div>
+
+<div class="modal" id="mConfirm">
+  <div class="modal-box glass">
+    <div style="font-size:2.2rem; margin-bottom:10px;" id="mConfirmIcon"></div>
+    <h2 id="mConfirmTitle"></h2>
+    <p id="mConfirmMsg"></p>
+    <button id="mConfirmOk" class="btn btn-primary">Confirm</button>
+    <button class="btn btn-ghost" onclick="mClose('mConfirm'); _cr && _cr(false);">Cancel</button>
+  </div>
+</div>
+
+<div class="modal" id="mOtpApproval">
+  <div class="modal-box glass">
+    <div style="font-size:2.5rem; margin-bottom:12px;">🔑</div>
+    <h2>Parent OTP Verification</h2>
+    <p id="mOtpInfo"></p>
+    <input type="text" id="mOtpInput" class="field" maxlength="6" placeholder="Enter 6-digit OTP"
+           style="text-align:center; font-size:1.55rem; letter-spacing:8px;"
+           onkeydown="if(event.key==='Enter') submitOTP()">
+
+    <button class="btn btn-primary" onclick="submitOTP()" style="margin:12px 0 8px 0;">
+      ✓ Verify & Approve
+    </button>
+
+    <button class="btn btn-ghost" onclick="resendOTP()" style="margin-bottom:8px;">
+      🔄 Resend OTP
+    </button>
+
+    <button class="btn btn-ghost" onclick="mClose('mOtpApproval')">Cancel</button>
+  </div>
+</div>
+<div class="modal" id="mForgot">
+  <div class="modal-box glass">
+    <div style="font-size:2.2rem; margin-bottom:10px;"></div>
+    <h2>Forgot Password?</h2>
+    <p>Enter your registered email and we'll send a security code.</p>
+    <input type="email" id="forgotEmail" class="field" placeholder="your@email.com">
+    <button class="btn btn-primary" onclick="sendForgotCode()">Send Security Code</button>
+    <button class="btn btn-ghost" onclick="mClose('mForgot')">Cancel</button>
+  </div>
+</div>
+
+<div class="modal" id="mSecCode">
+  <div class="modal-box glass">
+    <div style="font-size:2.2rem; margin-bottom:10px;"></div>
+    <h2>Enter Security Code</h2>
+    <p id="secCodeInfo"></p>
+    <input type="text" id="secCodeInput" class="field" maxlength="6" placeholder="6-digit code"
+           style="text-align:center; font-size:1.4rem; letter-spacing:6px;">
+    <button class="btn btn-primary" onclick="verifySecCode()">Continue</button>
+    <button class="btn btn-ghost" onclick="mClose('mSecCode')">Cancel</button>
+  </div>
+</div>
+
+<div class="modal" id="mResetPass">
+  <div class="modal-box glass">
+    <div style="font-size:2.2rem; margin-bottom:10px;">🔒</div>
+    <h2>Set New Password</h2>
+    <p>Choose a secure password (minimum 8 characters).</p>
+    <input type="password" id="newPass1" class="field" placeholder="New password">
+    <input type="password" id="newPass2" class="field" placeholder="Confirm new password">
+    <button class="btn btn-primary" onclick="doResetPass()">Update Password</button>
+    <button class="btn btn-ghost" onclick="mClose('mResetPass')">Cancel</button>
+  </div>
+</div>
+
+<div class="modal" id="mPassDetail">
+  <div class="modal-box glass" style="max-width:480px;">
+    <h2 id="pdReason" style="font-size:1.4rem;"></h2>
+    <p id="pdMeta"></p>
+    <span id="pdStatus" class="badge" style="margin-bottom:18px; display:inline-block;"></span>
+    <div id="pdQR" style="display:flex; justify-content:center; margin:16px 0;"></div>
+    <p id="pdExpiry" style="font-size:.82rem; color:var(--muted); margin-bottom:8px;"></p>
+    <button class="btn btn-ghost" onclick="mClose('mPassDetail')">Close</button>
+  </div>
+</div>
+
+<div class="modal" id="mAddUser">
+  <div class="modal-box glass" style="max-width:460px;">
+    <div style="font-size:2.2rem; margin-bottom:10px;"><i class="fas fa-user-plus"></i></div>
+    <h2>Add New User</h2>
+    <p>Create a login and assign an employee ID for any portal.</p>
+    <input id="au_name" class="field" placeholder="Full Name *">
+    <input id="au_email" type="email" class="field" placeholder="Email Address *">
+    <input id="au_pass" type="password" class="field" placeholder="Temporary Password *">
+    <select id="au_role" class="field" onchange="regenEmpId()">
+      <option value="teacher">Teacher</option>
+      <option value="student">Student</option>
+      <option value="guard">Security Guard</option>
+      <option value="principal">Principal</option>
+      <option value="admin">Admin</option>
+    </select>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <input id="au_empid" class="field" placeholder="Employee ID" style="margin:9px 0;">
+      <button type="button" class="btn btn-ghost" style="width:auto; white-space:nowrap; margin:9px 0;" onclick="regenEmpId()">↻ New ID</button>
+    </div>
+    <button class="btn btn-primary" onclick="submitAddUser()"><i class="fas fa-user-plus"></i> Create User</button>
+    <button class="btn btn-ghost" onclick="mClose('mAddUser')">Cancel</button>
+  </div>
+</div>
+
+<div class="modal" id="mCreateNotice">
+  <div class="modal-box glass" style="max-width:480px;">
+    <div style="font-size:2.2rem; margin-bottom:10px;">📢</div>
+    <h2>Circulate Notice</h2>
+    <p>This will be broadcast instantly to Teacher, Student, Guard and Admin portals.</p>
+    <input id="nc_title" class="field" placeholder="Notice Title *">
+    <textarea id="nc_message" class="field" rows="4" placeholder="Message *" style="resize:vertical;"></textarea>
+    <select id="nc_priority" class="field">
+      <option value="normal">Normal Priority</option>
+      <option value="high">High Priority</option>
+      <option value="low">Low Priority</option>
+    </select>
+    <button class="btn btn-primary" onclick="submitNotice()">📢 Send to All Portals</button>
+    <button class="btn btn-ghost" onclick="mClose('mCreateNotice')">Cancel</button>
+  </div>
+</div>
+
+<script>
+window.onload = function () {
+    if (window.google && window.google.accounts && window.google.accounts.id) {
+        window.google.accounts.id.initialize({
+            client_id: "586150752639-3oehdsm04t32nhe7ahd4ua63hc4g8qdg.apps.googleusercontent.com",
+            callback: handleGoogleLogin
+        });
+    }
+};
+
+const LS = {
+  set(k,v){ try{ localStorage.setItem(k, typeof v==='object'?JSON.stringify(v):v); }catch(e){} },
+  get(k){ try{ const d=localStorage.getItem(k); try{return JSON.parse(d);}catch{return d;} }catch{return null;} },
+  del(k){ try{ localStorage.removeItem(k); }catch(e){} }
+};
+
+let currentUser = null;
+let myPasses = [];
+let allUsers = [];
+let removedUsers = []; // NEW: For Recycle Bin
+let notices = [];
+let currentTab = 'home';
+let _authRole = null;
+let _authMode = 'login';
+let pendingPassId = null;
+let mainChart = null;
+let socket = null;
+let _refreshTimer = null;
+let _forgotEmail = '';
+let onlineUsers = [];
+
+const BACKEND = "http://localhost:5000";
+
+function toast(msg, type='info'){
+  const t = document.createElement('div');
+  t.className = 'toast';
+  const ico = {success:'', error:'', info:'ℹ', warning:''}[type]||'ℹ';
+  t.innerHTML = `<span style="font-size:1.15rem;">${ico}</span><span style="flex:1;">${msg}</span>`;
+  document.getElementById('toastBox').appendChild(t);
+  setTimeout(()=>t.classList.add('show'), 10);
+  setTimeout(()=>{ t.classList.remove('show'); setTimeout(()=>t.remove(),380); }, 3200);
+}
+window.toast = toast;
+
+function mOpen(id){ document.getElementById(id).classList.add('open'); }
+function mClose(id){ document.getElementById(id).classList.remove('open'); }
+
+let _cr = null;
+function confirm2(title, msg, icon=''){
+  return new Promise(res=>{
+    _cr = res;
+    document.getElementById('mConfirmIcon').textContent = icon;
+    document.getElementById('mConfirmTitle').textContent = title;
+    document.getElementById('mConfirmMsg').textContent = msg;
+    document.getElementById('mConfirmOk').onclick = ()=>{ mClose('mConfirm'); _cr=null; res(true); };
+    mOpen('mConfirm');
+  });
+}
+
+function initSocket(){
+  socket = io(BACKEND, {
+    auth: (cb) => cb({ token: LS.get('sp_token') }),
+    transports: ['websocket', 'polling'],
+    reconnectionAttempts: 10,
+    reconnectionDelay: 1000
+  });
+
+  socket.on('connect',()=>{
+    document.getElementById('connDot').className = 'dot on';
+    document.getElementById('connTxt').textContent = 'Live';
+    if(currentUser){
+      socket.emit('getMyPasses');
+      socket.emit('getNotices');
+      if(currentUser.role==='admin') {
+        socket.emit('getAllUsers');
+        socket.emit('getRemovedUsers');
+      }
+    }
+  });
+  socket.on('disconnect',()=>{
+    document.getElementById('connDot').className = 'dot off';
+    document.getElementById('connTxt').textContent = 'Offline';
+  });
+
+  socket.on('connect_error',(err)=>{
+    document.getElementById('connDot').className = 'dot off';
+    document.getElementById('connTxt').textContent = 'Server down';
+    console.error('Socket Error:', err);
+    toast('Cannot connect to backend at ' + BACKEND, 'error');
+  });
+
+  socket.on('loginSuccess', data=>{
+    currentUser = data.user;
+    if (currentUser.role !== _authRole) {
+      currentUser = null;
+      toast('Role mismatch: You are not authorized for this portal.', 'error');
+      setBtnLoading(false);
+      resetGoogleBtn();
+      return;
+    }
+    LS.set('sp_user', currentUser);
+    if (data.accessToken) {
+      LS.set('sp_token', data.accessToken);
+      socket.auth = { token: data.accessToken };
+    }
+    if (data.refreshToken) LS.set('sp_refresh', data.refreshToken);
+    startTokenRefreshLoop();
+    toast(`Welcome, ${currentUser.username||currentUser.email}`, 'success');
+    goDash();
+  });
+
+  socket.on('loginError', msg=>{
+    toast(msg, 'error');
+    setBtnLoading(false);
+    resetGoogleBtn();
+  });
+
+  socket.on('registerSuccess', data=>{
+    currentUser = data.user;
+    LS.set('sp_user', currentUser);
+    if (data.accessToken) {
+      LS.set('sp_token', data.accessToken);
+      socket.auth = { token: data.accessToken };
+    }
+    if (data.refreshToken) LS.set('sp_refresh', data.refreshToken);
+    startTokenRefreshLoop();
+    toast('Account created & logged in successfully.', 'success');
+    goDash();
+  });
+
+  socket.on('registerError', msg=>{
+    toast(msg, 'error');
+    setBtnLoading(false);
+  });
+
+  socket.on('myPasses', passes=>{
+    myPasses = passes;
+    refreshDash();
+  });
+
+  socket.on('updatePasses', passes=>{
+    if(!currentUser) return;
+    if(currentUser.role === 'student'){
+      myPasses = passes.filter(p => p.parent_email === currentUser.email || p.email === currentUser.email);
+    } else if(currentUser.role === 'guard'){
+      myPasses = passes.filter(p => ['Approved','Pending'].includes(p.status));
+    } else {
+      myPasses = passes;
+    }
+    refreshDash();
+  });
+
+  socket.on('passCreated', ()=>{
+    toast('Pass created — OTP sent to parent email.', 'success');
+    socket.emit('getMyPasses');
+    document.getElementById('createPassForm')?.reset();
+    setTab('home');
+  });
+
+  socket.on('passError', msg => toast(msg, 'error'));
+
+  socket.on('otpVerified', ()=>{
+    toast('Pass Approved. QR Code generated & saved.', 'success');
+    mClose('mOtpApproval');
+    pendingPassId = null;
+    socket.emit('getMyPasses');
+  });
+
+  socket.on('otpError', msg => toast(msg, 'error'));
+
+  socket.on('passUsed', ()=>{
+    toast('Entry recorded in the system.', 'success');
+    socket.emit('getMyPasses');
+  });
+
+  socket.on('forceLogout', data=>{
+    toast(data?.message || 'Your session has been ended by an administrator.', 'warning');
+    setTimeout(()=>{ doLogoutImmediate(); }, 1200);
+  });
+
+  socket.on('lockdownAlert', data=>{
+    toast(` ${data.message}`, 'error');
+  });
+
+  socket.on('allUsers', list=>{
+    allUsers = list || [];
+    refreshDash();
+  });
+
+  // NEW: Listener for removed users (Recycle Bin)
+  socket.on('removedUsers', list=>{
+    removedUsers = list || [];
+    if(currentTab === 'recyclebin') refreshDash();
+  });
+
+  socket.on('adminAddUserSuccess', data=>{
+    toast(`User created — Employee ID ${data.employeeId||''}`, 'success');
+    mClose('mAddUser');
+    socket.emit('getAllUsers');
+  });
+  socket.on('adminAddUserError', msg => toast(msg, 'error'));
+  socket.on('adminUserCreated', data => {
+    toast(`User created — Employee ID ${data.employeeId||''}`, 'success');
+    mClose('mAddUser');
+    socket.emit('getAllUsers');
+  });
+  socket.on('adminError', msg => toast(msg, 'error'));
+
+  socket.on('adminRemoveUserSuccess', ()=>{
+    toast('User removed from the system.', 'success');
+    socket.emit('getAllUsers');
+    socket.emit('getRemovedUsers'); // Refresh recycle bin too
+  });
+  socket.on('adminRemoveUserError', msg => toast(msg, 'error'));
+
+  // NEW: Restore User Listeners
+  socket.on('adminRestoreUserSuccess', ()=>{
+    toast('User restored successfully.', 'success');
+    socket.emit('getAllUsers');
+    socket.emit('getRemovedUsers');
+  });
+  socket.on('adminRestoreUserError', msg => toast(msg, 'error'));
+
+  // NEW: Permanent Delete Listeners
+  socket.on('adminPermanentDeleteSuccess', ()=>{
+    toast('User permanently deleted.', 'success');
+    socket.emit('getAllUsers');
+    socket.emit('getRemovedUsers');
+  });
+  socket.on('adminPermanentDeleteError', msg => toast(msg, 'error'));
+
+  socket.on('adminActionSuccess', msg => toast(msg || 'Action completed.', 'success'));
+  socket.on('adminActionError', msg => toast(msg, 'error'));
+
+  socket.on('noticesUpdate', list=>{
+    notices = list || [];
+    renderNoticeBanner();
+    if(currentTab==='notices') setTab('notices');
+  });
+  socket.on('noticeCreated', ()=>{
+    toast('Notice circulated to all portals.', 'success');
+    mClose('mCreateNotice');
+    document.getElementById('nc_title') && (document.getElementById('nc_title').value='');
+    document.getElementById('nc_message') && (document.getElementById('nc_message').value='');
+    socket.emit('getNotices');
+  });
+  socket.on('noticeError', msg => toast(msg, 'error'));
+
+  socket.on('otpSent', ()=>{
+    document.getElementById('secCodeInfo').textContent = `Code sent to ${_forgotEmail}`;
+    document.getElementById('secCodeInput').value='';
+    mClose('mForgot');
+    mOpen('mSecCode');
+  });
+  socket.on('resetSuccess', ()=>{
+    mClose('mResetPass');
+    toast('Password updated — please sign in with your new password.','success');
+  });
+  socket.on('resetError', msg => {
+    toast(msg, 'error');
+    window._pendingResetOtp = null;
+    mClose('mResetPass');
+    mOpen('mSecCode');
+  });
+
+  socket.on('resetOTPVerified', () => {
+    mClose('mSecCode');
+    document.getElementById('newPass1').value = '';
+    document.getElementById('newPass2').value = '';
+    mOpen('mResetPass');
+    toast('Code verified. Set your new password.', 'success');
+  });
+
+  socket.on('resetOTPError', (msg) => {
+    toast(msg || 'Invalid or expired security code.', 'error');
+    document.getElementById('secCodeInput').value = '';
+    window._pendingResetOtp = null;
+  });
+
+  socket.on('activeUsers', (users) => {
+    onlineUsers = users || [];
+    if(['monitor', 'liveUsers', 'home'].includes(currentTab)) refreshDash();
+  });
+
+  socket.on('onlineUsers', (users) => {
+    onlineUsers = users || [];
+    if(['monitor', 'liveUsers', 'home'].includes(currentTab)) refreshDash();
+  });
+
+  socket.on('error', msg => toast(msg||'An error occurred', 'error'));
+}
+
+function startTokenRefreshLoop(){
+  if(_refreshTimer) clearInterval(_refreshTimer);
+  _refreshTimer = setInterval(refreshAccessToken, 10 * 60 * 1000);
+}
+
+function stopTokenRefreshLoop(){
+  if(_refreshTimer){ clearInterval(_refreshTimer); _refreshTimer = null; }
+}
+
+async function refreshAccessToken(){
+  const refreshToken = LS.get('sp_refresh');
+  if(!refreshToken || !currentUser) return;
+  try{
+    const res = await fetch(`${BACKEND}/refresh-token`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ refreshToken })
+    });
+    const data = await res.json();
+    if(data.success && data.accessToken){
+      LS.set('sp_token', data.accessToken);
+      if(socket) socket.auth = { token: data.accessToken };
+    } else {
+      stopTokenRefreshLoop();
+      toast('Your session has expired. Please log in again.', 'warning');
+      doLogoutImmediate();
+    }
+  } catch(e){}
+}
+
+function selectPortal(role){
+  _authRole = role;
+  _authMode = 'login';
+  document.getElementById('pageLanding').style.display = 'none';
+  goAuth();
+}
+
+const PORTAL_META = {
+  teacher:   { icon:'<i class="fas fa-chalkboard-teacher"></i>', label:'Teacher Portal',       color:'#6366f1' },
+  student:   { icon:'<i class="fas fa-user-graduate"></i>', label:'Student Portal',       color:'#3b82f6' },
+  guard:     { icon:'<i class="fas fa-shield-alt"></i>', label:'Guard Portal',         color:'#22c55e' },
+  principal: { icon:'<i class="fas fa-user-tie"></i>', label:'Principal Portal',     color:'#a855f7' },
+  admin:     { icon:'<i class="fas fa-user-shield"></i>', label:'Admin Portal',       color:'#f59e0b' },
+};
+
+const EXTRA_FIELDS = {
+  teacher:   `<input id="r_dept" class="field" placeholder="Department (optional)">`,
+  student: `
+    <input id="r_mobile" class="field" placeholder="Mobile Number *" type="tel">
+    <input id="r_roll"   class="field" placeholder="Roll Number *">
+    <input id="r_dept"   class="field" placeholder="Department *">
+  `,
+  guard:     `<input id="r_phone" class="field" placeholder="Phone Number (optional)" type="tel">`,
+  principal: `<input id="r_institute" class="field" placeholder="Institute / College Name *">`,
+};
+
+function goAuth(){
+  document.getElementById('pageAuth').classList.add('open');
+  renderAuthBox();
+}
+
+function renderAuthBox(){
+  const m = PORTAL_META[_authRole];
+  const box = document.getElementById('authBox');
+  const isAdmin = _authRole === 'admin';
+
+  if(isAdmin) _authMode = 'login';
+
+  if(_authMode === 'login'){
+    box.innerHTML = `
+      <div style="font-size:2.6rem;text-align:center;margin-bottom:10px;">${m.icon}</div>
+      <h1>SmartPass Pro</h1>
+      <div class="auth-subtitle">${m.label}${isAdmin?' <span class="admin-badge" style="margin-left:6px;">Super Access</span>':''}</div>
+      <input id="l_email" type="email" class="field" placeholder="Email Address" autocomplete="email">
+      <input id="l_pass"  type="password" class="field" placeholder="Password" autocomplete="current-password"
+             onkeydown="if(event.key==='Enter') doLogin()">
+      <div style="text-align:right; margin:-3px 0 14px;">
+        <a href="#" onclick="mOpen('mForgot')" style="color:var(--accent);font-size:.88rem;">Forgot Password?</a>
+      </div>
+      <button id="authBtn" class="btn btn-primary" onclick="doLogin()">Sign In</button>
+      ${isAdmin
+        ? `<p style="text-align:center;color:var(--muted);font-size:.82rem;margin-top:10px;">
+             Admin accounts are created by another administrator — self-registration is disabled for this portal.
+           </p>`
+        : `<div class="auth-divider">or</div>
+        <div id="googleBtn"></div>
+           <p style="text-align:center;color:var(--muted);font-size:.78rem;margin-top:8px;">
+             New here? Signing in with Google sets up your ${_authRole} account automatically.
+           </p>
+           <button class="btn btn-ghost" style="margin-top:4px;"
+                  onclick="_authMode='register'; renderAuthBox()">
+             Don't have an account? — Register
+           </button>`
+      }
+      <button class="btn btn-ghost" style="margin-top:4px; opacity:.6;"
+              onclick="backToLanding()">← Back to Portals</button>
+    `;
+
+    setTimeout(() => {
+        if (window.google && window.google.accounts && window.google.accounts.id) {
+            window.google.accounts.id.renderButton(document.getElementById("googleBtn"), {
+                theme: "outline",
+                size: "large",
+                width: "100%"
+            });
+        }
+    }, 100);
+  } else {
+    box.innerHTML = `
+      <div style="font-size:2.2rem;text-align:center;margin-bottom:8px;">${m.icon}</div>
+      <h1 style="font-size:1.7rem;">Create Account</h1>
+      <div class="auth-subtitle">${m.label}</div>
+      <input id="r_name"  class="field" placeholder="Full Name *" autocomplete="name">
+      <input id="r_email" type="email" class="field" placeholder="Email Address *" autocomplete="email">
+      ${EXTRA_FIELDS[_authRole]||''}
+      <input id="r_pass"  type="password" class="field" placeholder="Password (min 8 chars) *" autocomplete="new-password">
+      <button id="authBtn" class="btn btn-primary" onclick="doRegister()">Create Account</button>
+      <button class="btn btn-ghost" style="margin-top:4px;"
+              onclick="_authMode='login'; renderAuthBox()">
+        Already have an account? — Sign In
+      </button>
+      <button class="btn btn-ghost" style="margin-top:4px; opacity:.6;"
+              onclick="backToLanding()">← Back to Portals</button>
+    `;
+  }
+}
+
+function backToLanding(){
+  document.getElementById('pageAuth').classList.remove('open');
+  document.getElementById('pageLanding').style.display = '';
+  _authRole = null;
+}
+
+function setBtnLoading(loading){
+  const b = document.getElementById('authBtn');
+  if(!b) return;
+  b.disabled = loading;
+  b.textContent = loading ? 'Please wait…' : (_authMode==='login' ? 'Sign In' : 'Create Account');
+}
+
+function resetGoogleBtn(){
+  const btn = document.getElementById('googleBtn');
+  if(btn) {
+      btn.style.opacity = '1';
+      btn.style.pointerEvents = 'auto';
+  }
+}
+
+function doLogin(){
+  const email = document.getElementById('l_email')?.value.trim();
+  const pass  = document.getElementById('l_pass')?.value;
+  if(!email||!pass) return toast('Enter your email and password', 'error');
+  if(!socket?.connected) return toast('Not connected to server yet — please wait', 'warning');
+
+  setBtnLoading(true);
+  socket.emit("login", { email, password: pass, selectedPortal: _authRole });
+}
+
+async function handleGoogleLogin(response){
+    const res = await fetch(
+        "http://localhost:5000/auth/google",
+        {
+            method:"POST",
+            headers:{
+                "Content-Type":"application/json"
+            },
+            body:JSON.stringify({
+                credential: response.credential,
+                selectedPortal: _authRole
+            })
+        });
+
+    const data = await res.json();
+
+    if(!data.success){
+        toast(data.message,"error");
+        return;
+    }
+
+    LS.set("sp_user",data.user);
+    LS.set("sp_token",data.accessToken);
+    LS.set("sp_refresh",data.refreshToken);
+    currentUser=data.user;
+    goDash();
+}
+
+function doRegister(){
+  if(_authRole === 'admin') return toast('Admin registration is disabled. Ask an existing admin to create your account.', 'error');
+  const name  = document.getElementById('r_name')?.value.trim();
+  const email = document.getElementById('r_email')?.value.trim();
+  const pass  = document.getElementById('r_pass')?.value;
+  if(!name||!email||!pass) return toast('Name, email, and password are required', 'error');
+  if(pass.length < 8)      return toast('Password must be at least 8 characters', 'error');
+  if(!socket?.connected)   return toast('Not connected to server yet — please wait', 'warning');
+
+  const dept      = document.getElementById('r_dept')?.value.trim() || null;
+  const mobile    = document.getElementById('r_mobile')?.value.trim() || null;
+  const rollNumber= document.getElementById('r_roll')?.value.trim() || null;
+  const phone     = document.getElementById('r_phone')?.value.trim() || null;
+  const institute = document.getElementById('r_institute')?.value.trim() || null;
+
+  if(_authRole === 'student' && (!mobile || !rollNumber || !dept)){
+    return toast('Mobile number, roll number, and department are required for students', 'error');
+  }
+  if(_authRole === 'principal' && !institute){
+    return toast('Institute / college name is required for principals', 'error');
+  }
+
+  const payload = {
+    username: name,
+    email,
+    password: pass,
+    role: _authRole,
+    institute,
+    department: dept,
+    phone: phone || mobile,
+    mobile,
+    rollNumber,
+  };
+  setBtnLoading(true);
+  socket.emit('register', payload);
+}
+
+function goDash(){
+  document.getElementById('pageLanding').style.display = 'none';
+  document.getElementById('pageAuth').classList.remove('open');
+  document.getElementById('pageDash').classList.add('open');
+
+  document.getElementById('sbName').textContent  = currentUser.username || 'User';
+  document.getElementById('sbRole').textContent  = currentUser.role;
+  document.getElementById('sbEmail').textContent = currentUser.email;
+  document.getElementById('sbEmpId').innerHTML   = currentUser.employeeId
+    ? `<span class="emp-id">${currentUser.employeeId}</span>`
+    : (currentUser.role==='admin' ? `<span class="admin-badge">Super Access</span>` : '');
+
+  const saved = LS.get(`sp_photo_${currentUser.id}`);
+  if(saved) document.getElementById('sbPhoto').src = saved;
+
+  buildNav();
+  setTab('home');
+  if(socket?.connected){
+    socket.emit('getMyPasses');
+    socket.emit('getNotices');
+    if(currentUser.role==='admin') {
+      socket.emit('getAllUsers');
+      socket.emit('getRemovedUsers');
+    }
+  }
+}
+
+const NAV = {
+  teacher:   [{id:'home',l:' Dashboard'},{id:'create',l:'Create Pass'},{id:'profile',l:' Profile'}],
+  student:   [{id:'home',l:'Dashboard'},{id:'passes',l:' My Passes'},{id:'profile',l:'Profile'}],
+  guard:     [{id:'home',l:' Verify Pass'},{id:'history',l:' Scan History'},{id:'profile',l:' Profile'}],
+  principal: [{id:'home',l:' Overview'},{id:'allpasses',l:' All Passes'},{id:'teachers',l:' Teachers'},{id:'students',l:' Students'},{id:'guards',l:'Guards'},{id:'notices',l:' Notices'},{id:'liveUsers',l:' Live Users'},{id:'profile',l:' Profile'}],
+  admin:     [{id:'home',l:' Overview'},{id:'monitor',l:' Portal Monitor'},{id:'users',l:' User Management'},{id:'recyclebin',l:' Recycle Bin'},{id:'allpasses',l:' All Passes'},{id:'security',l:' Security Flow'},{id:'notices',l:' Notices'},{id:'profile',l:' Profile'}],
+};
+
+function buildNav(){
+  const items = NAV[currentUser.role]||[];
+  document.getElementById('sbNav').innerHTML = items.map(x=>
+    `<button class="btn btn-nav" id="nav_${x.id}" onclick="setTab('${x.id}')">${x.l}</button>`
+  ).join('')+`
+    <hr style="border:none;border-top:1px solid var(--border);margin:16px 0;">
+    <button class="btn btn-ghost" onclick="exportPDF()" style="margin-top:0;"> Export PDF</button>
+    <button class="btn btn-ghost" onclick="toggleTheme()"> Toggle Theme</button>
+    <button class="btn btn-danger" onclick="doLogout()" style="margin-top:14px;">⏻ Logout</button>
+  `;
+}
+
+function setTab(tab){
+  currentTab = tab;
+  closeSB();
+  document.querySelectorAll('.btn-nav').forEach(b=>b.classList.remove('active'));
+  document.getElementById('nav_'+tab)?.classList.add('active');
+  const el = document.getElementById('dashContent');
+  const role = currentUser?.role;
+  if(tab==='home'){
+    if(role==='teacher')   renderTeacherHome(el);
+    else if(role==='student')   renderStudentHome(el);
+    else if(role==='guard')     renderGuardVerify(el);
+    else if(role==='principal') renderPrincipalOverview(el);
+    else if(role==='admin')     renderAdminHome(el);
+    document.getElementById('dashTitle').textContent =
+      role==='guard' ? 'Gate Pass Verification' : role==='principal' ? 'Principal Overview' : role==='admin' ? 'Admin Overview' : 'Dashboard';
+  } else if(tab==='create')   { document.getElementById('dashTitle').textContent='Create Pass';   renderCreatePass(el); }
+  else if(tab==='passes')     { document.getElementById('dashTitle').textContent='My Passes';     renderStudentPasses(el); }
+  else if(tab==='history')    { document.getElementById('dashTitle').textContent='Scan History';  renderGuardHistory(el); }
+  else if(tab==='allpasses')  { document.getElementById('dashTitle').textContent='All Passes';    renderAllPasses(el); }
+  else if(tab==='teachers')   { document.getElementById('dashTitle').textContent='Teacher Activity'; renderActivity(el,'Teacher'); }
+  else if(tab==='students')   { document.getElementById('dashTitle').textContent='Student Activity'; renderActivity(el,'Student'); }
+  else if(tab==='guards')     { document.getElementById('dashTitle').textContent='Guard Activity';  renderActivity(el,'Guard'); }
+  else if(tab==='notices')    { document.getElementById('dashTitle').textContent='Notices';        renderNotices(el); }
+  else if(tab==='liveUsers')  { document.getElementById('dashTitle').textContent='Connected Users'; renderLiveUsersPage(el); }
+  else if(tab==='monitor')    { document.getElementById('dashTitle').textContent='Portal Monitor'; renderAdminMonitor(el); }
+  else if(tab==='users')      { document.getElementById('dashTitle').textContent='User Management'; renderAdminUsers(el); }
+  else if(tab==='recyclebin') { document.getElementById('dashTitle').textContent='Recycle Bin';    renderRecycleBin(el); }
+  else if(tab==='security')   { document.getElementById('dashTitle').textContent='Security Flow';  renderAdminSecurity(el); }
+  else if(tab==='profile')    { document.getElementById('dashTitle').textContent='Profile';       renderProfile(el); }
+}
+
+function refreshDash(){ setTab(currentTab); }
+
+function noticeBannerHTML(limit=3){
+  if(!notices.length) return '';
+  const items = notices.slice(0,limit).map(n=>`
+    <div class="notice-card ${n.priority||'normal'}">
+      <h4> ${n.title}</h4>
+      <p>${n.message}</p>
+      <div class="n-meta">From Principal${n.author?(' — '+n.author):''} • ${fmtDate(n.created_at)}</div>
+    </div>`).join('');
+  return `
+    <div class="glass" style="padding:22px 24px; margin-bottom:24px;">
+      <h3 style="margin-bottom:14px; font-size:1.05rem;"> Latest Notices</h3>
+      ${items}
+    </div>`;
+}
+
+function renderNoticeBanner(){
+  if(['home'].includes(currentTab)) refreshDash();
+}
+
+function renderNotices(el){
+  const role = currentUser.role;
+  const canCreate = role === 'principal' || role === 'admin';
+  el.innerHTML = `
+    ${canCreate ? `
+      <div class="glass" style="padding:26px; margin-bottom:24px;">
+        <h3 style="margin-bottom:10px;">Circulate a new notice</h3>
+        <p style="color:var(--muted); font-size:.88rem; margin-bottom:16px;">
+          Notices you send here appear instantly on the Teacher, Student, Guard and Admin dashboards.
+        </p>
+        <button class="btn btn-primary" style="max-width:280px;" onclick="mOpen('mCreateNotice')"> New Notice</button>
+      </div>` : ''}
+    <div class="glass" style="padding:26px;">
+      <h3 style="margin-bottom:16px;">All Notices</h3>
+      ${!notices.length
+        ? `<p style="color:var(--muted);text-align:center;padding:40px 0;">No notices circulated yet.</p>`
+        : notices.map(n=>`
+            <div class="notice-card ${n.priority||'normal'}">
+              <h4>${n.title}</h4>
+              <p>${n.message}</p>
+              <div class="n-meta">From Principal${n.author?(' — '+n.author):''} • ${fmtDate(n.created_at)}</div>
+            </div>`).join('')
+      }
+    </div>`;
+}
+
+function submitNotice(){
+  const title = document.getElementById('nc_title').value.trim();
+  const message = document.getElementById('nc_message').value.trim();
+  const priority = document.getElementById('nc_priority').value;
+  if(!title||!message) return toast('Title and message are required','error');
+  if(!socket?.connected) return toast('Not connected to the server','warning');
+  socket.emit('createNotice', { title, message, priority });
+  toast('Sending notice…','info');
+}
+
+function renderTeacherHome(el){
+  const total    = myPasses.length;
+  const approved = myPasses.filter(p=>p.status==='Approved').length;
+  const pending  = myPasses.filter(p=>p.status==='Pending').length;
+  const now      = Date.now();
+  const expiring = myPasses.filter(p=>{
+    if(p.status!=='Approved'||!p.expires_at) return false;
+    const d = new Date(p.expires_at).getTime()-now;
+    return d>0 && d<864e5;
+  }).length;
+  const rate = total ? Math.round((approved/total)*100) : 0;
+
+  el.innerHTML = `
+    ${noticeBannerHTML()}
+    <div class="stats-grid">
+      <div class="stat-card glass"><div class="label">Active Passes</div>
+        <div class="value" style="color:var(--success);">${approved}</div></div>
+      <div class="stat-card glass"><div class="label">Pending Approval</div>
+        <div class="value" style="color:var(--warning);">${pending}</div></div>
+      <div class="stat-card glass"><div class="label">Expiring (24 h)</div>
+        <div class="value" style="color:var(--error);">${expiring}</div></div>
+      <div class="stat-card glass"><div class="label">Approval Rate</div>
+        <div class="value" style="color:var(--accent);">${rate}%</div></div>
+    </div>
+    <div class="glass" style="padding:26px; height:360px; margin-bottom:28px;">
+      <canvas id="tChart"></canvas>
+    </div>
+    <div class="glass" style="overflow:hidden; margin-bottom:10px;">
+      ${buildPassTable()}
+    </div>
+  `;
+  buildTeacherChart();
+}
+
+function buildPassTable(){
+  if(!myPasses.length) return `<div style="padding:50px;text-align:center;color:var(--muted);">No passes yet — create one!</div>`;
+  const rows = myPasses.map(p=>{
+    const sc = 's-'+p.status;
+    const action = p.status==='Pending'
+      ? `<button onclick="openOTPModal(${p.id},'${p.parent_email}')"
+              style="padding:7px 15px;border-radius:10px;background:linear-gradient(135deg,#6366f1,#4f52e0);
+                     color:#fff;border:none;cursor:pointer;font-weight:600;font-size:.85rem;">
+             Approve
+         </button>`
+      : p.status==='Approved'
+      ? `<span style="color:var(--success);font-weight:600;">✓ Approved</span>`
+      : `<span style="color:var(--muted);">${p.status}</span>`;
+    return `
+      <tr>
+        <td><strong>${p.student}</strong></td>
+        <td style="color:var(--muted);max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.reason}</td>
+        <td style="font-size:.82rem;color:var(--muted);">${p.parent_email}</td>
+        <td><span class="badge ${sc}">${p.status}</span></td>
+        <td style="font-size:.82rem;color:var(--muted);">${fmtDate(p.created_at)}</td>
+        <td>${action}</td>
+      </tr>`;
+  }).join('');
+  return `<div class="table-wrap"><table>
+    <thead><tr><th>Student</th><th>Reason</th><th>Parent Email</th><th>Status</th><th>Created</th><th>Action</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table></div>`;
+}
+
+function buildTeacherChart(){
+  setTimeout(()=>{
+    const canvas = document.getElementById('tChart');
+    if(!canvas) return;
+    if(mainChart){ mainChart.destroy(); mainChart=null; }
+    const labels=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+    const counts=new Array(7).fill(0);
+    myPasses.forEach(p=>{
+      const d=new Date(p.created_at).getDay();
+      counts[d===0?6:d-1]++;
+    });
+    mainChart = new Chart(canvas,{
+      type:'bar',
+      data:{
+        labels,
+        datasets:[{
+          label:'Passes Created',
+          data:counts,
+          backgroundColor:'rgba(99,102,241,.75)',
+          borderColor:'#6366f1',
+          borderRadius:10, borderWidth:2
+        },{
+          label:'Approved',
+          data:labels.map((_,i)=>myPasses.filter(p=>p.status==='Approved'&&(new Date(p.created_at).getDay()===0?6:new Date(p.created_at).getDay()-1)===i).length),
+          backgroundColor:'rgba(34,197,94,.55)',
+          borderColor:'#22c55e',
+          borderRadius:10, borderWidth:2
+        }]
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{legend:{labels:{color:'#e2e8f0'}}},
+        scales:{
+          x:{ticks:{color:'#94a3b8'}, grid:{color:'rgba(255,255,255,.05)'}},
+          y:{ticks:{color:'#94a3b8',stepSize:1}, grid:{color:'rgba(255,255,255,.05)'}}
+        }
+      }
+    });
+  },80);
+}
+
+function renderCreatePass(el){
+  el.innerHTML = `
+    <div class="glass" style="padding:34px; max-width:660px;">
+      <h2 style="margin-bottom:22px;"> New Gate Pass</h2>
+      <form id="createPassForm" onsubmit="submitPass(event)">
+        <input id="cp_student" class="field" placeholder="Student Full Name *" required>
+        <input id="cp_email"   type="email" class="field" placeholder="Parent Email Address *" required>
+        <input id="cp_reason"  class="field" placeholder="Reason for Pass *" required>
+        <div class="form-row" style="margin-top:4px;">
+          <div>
+            <label style="font-size:.82rem;color:var(--muted);display:block;margin-bottom:5px;">Duration – Hours</label>
+            <input id="cp_hours" type="number" class="field" value="8" min="1" max="24" style="margin:0;">
+          </div>
+          <div>
+            <label style="font-size:.82rem;color:var(--muted);display:block;margin-bottom:5px;">Duration – Days</label>
+            <input id="cp_days" type="number" class="field" value="1" min="1" max="30" style="margin:0;">
+          </div>
+        </div>
+        <div class="info-box" style="margin:18px 0;">
+          <strong>ℹ How it works:</strong>
+          An OTP will be generated and <em>emailed to the parent</em> automatically.
+          After the parent shares the OTP, click <em>Approve</em> on the pass to verify it.
+        </div>
+        <button type="submit" class="btn btn-primary"> Generate Pass & Send OTP</button>
+      </form>
+    </div>`;
+}
+
+async function submitPass(e){
+  e.preventDefault();
+  const student = document.getElementById('cp_student').value.trim();
+  const email   = document.getElementById('cp_email').value.trim();
+  const reason  = document.getElementById('cp_reason').value.trim();
+
+  if(!student || !email || !reason) return toast('Fill all required fields','error');
+
+  if(!socket?.connected) return toast('Not connected to the server — please wait', 'warning');
+  if(!currentUser) return toast('Your session has expired. Please log in again.', 'error');
+
+  const ok = await confirm2('Create Gate Pass', `Send OTP to ${email} for ${student}?`);
+  if(!ok) return;
+
+  socket.emit('createPass',{
+    student,
+    email,
+    reason,
+    hours: parseInt(document.getElementById('cp_hours').value)||8,
+    days:  parseInt(document.getElementById('cp_days').value)||1,
+  });
+  toast('Sending pass & OTP...', 'info');
+}
+
+function openOTPModal(passId, parentEmail){
+  pendingPassId = passId;
+  document.getElementById('mOtpInfo').innerHTML = `
+    OTP sent to: <strong>${parentEmail}</strong><br>
+    <small style="color:var(--muted);">Only the correct OTP from backend will work</small>
+  `;
+  document.getElementById('mOtpInput').value = '';
+  mOpen('mOtpApproval');
+  setTimeout(() => document.getElementById('mOtpInput').focus(), 300);
+}
+
+function resendOTP(){
+  if(!pendingPassId) return toast('No pass selected', 'error');
+  if(!socket?.connected) return toast('Not connected to server', 'error');
+
+  socket.emit('resendOTP', { passId: pendingPassId });
+  toast('Requesting new OTP...', 'info');
+}
+
+function submitOTP(){
+  const otp = document.getElementById('mOtpInput').value.trim();
+  if(otp.length !== 6) return toast('Enter full 6-digit OTP', 'error');
+  if(!pendingPassId) return toast('No pass selected', 'error');
+
+  socket.emit('verifyOTP', { passId: pendingPassId, otp });
+  toast('Verifying with server...', 'info');
+}
+
+function renderStudentHome(el){
+  const total    = myPasses.length;
+  const approved = myPasses.filter(p=>p.status==='Approved').length;
+  const pending  = myPasses.filter(p=>p.status==='Pending').length;
+  const rejected = myPasses.filter(p=>p.status==='Rejected').length;
+
+  el.innerHTML = `
+    ${noticeBannerHTML()}
+    <div class="stats-grid">
+      <div class="stat-card glass"><div class="label">Total Passes</div><div class="value">${total}</div></div>
+      <div class="stat-card glass"><div class="label">Approved</div><div class="value" style="color:var(--success);">${approved}</div></div>
+      <div class="stat-card glass"><div class="label">Pending</div><div class="value" style="color:var(--warning);">${pending}</div></div>
+      <div class="stat-card glass"><div class="label">Rejected</div><div class="value" style="color:var(--error);">${rejected}</div></div>
+    </div>
+    <div class="glass" style="padding:26px;">
+      <h3 style="margin-bottom:18px; font-size:1.2rem;">Recent Passes</h3>
+      ${!total
+        ? `<p style="color:var(--muted);text-align:center;padding:40px 0;">No passes yet — your teacher creates them.</p>`
+        : myPasses.slice(0,4).map((p,i)=>passCard(p,i)).join('')
+      }
+    </div>`;
+}
+
+function renderStudentPasses(el){
+  el.innerHTML = `
+    <div class="glass" style="padding:26px;">
+      ${!myPasses.length
+        ? `<p style="color:var(--muted);text-align:center;padding:60px 0;">No passes found in the system.</p>`
+        : myPasses.map((p,i)=>passCard(p,i)).join('')
+      }
+    </div>`;
+}
+
+function passCard(p,i){
+  const sc='s-'+p.status;
+  return `
+    <div class="pass-card glass" onclick="openPassDetail(${i})">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <strong style="font-size:1rem;">${p.reason}</strong>
+          <p style="color:var(--muted);font-size:.83rem;margin-top:3px;">${fmtDate(p.created_at)}</p>
+        </div>
+        <span class="badge ${sc}">${p.status}</span>
+      </div>
+    </div>`;
+}
+
+function openPassDetail(i){
+  const p = myPasses[i];
+  if(!p) return;
+  document.getElementById('pdReason').textContent = p.reason;
+  document.getElementById('pdMeta').textContent   = `Created: ${fmtDate(p.created_at)} • Expires: ${p.expires_at?fmtDate(p.expires_at):'N/A'}`;
+  const s = document.getElementById('pdStatus');
+  s.textContent = p.status; s.className = `badge s-${p.status}`;
+  const qrDiv = document.getElementById('pdQR');
+  qrDiv.innerHTML='';
+  if(p.status==='Approved' && p.qr_code){
+    const img=document.createElement('img');
+    img.src=p.qr_code;
+    img.style.cssText='width:190px;height:190px;border-radius:12px;border:4px solid white;';
+    qrDiv.appendChild(img);
+  } else {
+    qrDiv.innerHTML=`<p style="color:var(--muted);padding:20px;"> QR available after approval</p>`;
+  }
+  document.getElementById('pdExpiry').textContent = p.status==='Approved' ? ' Valid — show this QR to the guard.' : '';
+  mOpen('mPassDetail');
+}
+
+function renderGuardVerify(el){
+  el.innerHTML = `
+    ${noticeBannerHTML()}
+    <div class="glass" style="padding:34px; max-width:680px; margin:0 auto; text-align:center;">
+      <div style="font-size:2.8rem;margin-bottom:14px;"></div>
+      <h2 style="margin-bottom:6px;">Verify Gate Pass</h2>
+      <p style="color:var(--muted);margin-bottom:26px;">Enter the student's name or pass ID</p>
+      <input id="guardQuery" class="field" placeholder="Student name or pass #ID"
+             style="font-size:1.05rem;text-align:center;"
+             onkeydown="if(event.key==='Enter') guardVerify()">
+      <button class="btn btn-primary" onclick="guardVerify()" style="margin-top:4px;"> Verify Pass</button>
+      <div id="verifyOut" style="margin-top:26px;"></div>
+    </div>`;
+}
+
+function guardVerify(){
+  const q = document.getElementById('guardQuery').value.trim().toLowerCase();
+  if(!q) return toast('Enter student name or pass ID','error');
+  const out = document.getElementById('verifyOut');
+
+  const pass = myPasses.find(p=>
+    p.student?.toLowerCase().includes(q) || String(p.id)===q
+  );
+
+  if(pass && pass.status==='Approved'){
+    const expired = pass.expires_at && new Date(pass.expires_at)<new Date();
+    if(expired){
+      out.innerHTML=`<div class="vr" style="background:rgba(239,68,68,.13);border:1px solid rgba(239,68,68,.3);">
+        <div style="font-size:2.5rem;"></div><h2 style="color:var(--error);">PASS EXPIRED</h2>
+        <p><strong>${pass.student}</strong> — ${pass.reason}</p>
+        <p style="color:var(--muted);font-size:.85rem;margin-top:6px;">Expired: ${fmtDate(pass.expires_at)}</p>
+      </div>`;
+    } else {
+      out.innerHTML=`<div class="vr" style="background:rgba(34,197,94,.13);border:1px solid rgba(34,197,94,.3);">
+        <div style="font-size:2.5rem;"></div><h2 style="color:var(--success);">PASS VERIFIED</h2>
+        <p style="margin:4px 0;"><strong>Student:</strong> ${pass.student}</p>
+        <p style="margin:4px 0;"><strong>Reason:</strong> ${pass.reason}</p>
+        <p style="margin:4px 0;"><strong>Issued:</strong> ${fmtDate(pass.created_at)}</p>
+        ${pass.expires_at?`<p style="margin:4px 0;color:var(--muted);font-size:.85rem;">Expires: ${fmtDate(pass.expires_at)}</p>`:''}
+        ${pass.qr_code?`<img src="${pass.qr_code}" style="width:150px;height:150px;border-radius:10px;border:3px solid #fff;margin:14px auto;display:block;">`:''}
+        <button onclick="recordEntry(${pass.id},'${pass.student}')"
+                style="margin-top:14px;padding:11px 26px;border-radius:10px;background:#fff;color:#111;border:none;cursor:pointer;font-weight:700;">
+           Record Entry & Mark Used
+        </button>
+      </div>`;
+    }
+  } else if(pass && pass.status==='Pending'){
+    out.innerHTML=`<div class="vr" style="background:rgba(245,158,11,.13);border:1px solid rgba(245,158,11,.3);">
+      <div style="font-size:2.5rem;"></div><h2 style="color:var(--warning);">PASS PENDING</h2>
+      <p><strong>${pass.student}</strong> — ${pass.reason}</p>
+      <p style="color:var(--muted);font-size:.85rem;margin-top:6px;">Not yet approved by teacher.</p>
+    </div>`;
+  } else {
+    out.innerHTML=`<div class="vr" style="background:rgba(239,68,68,.13);border:1px solid rgba(239,68,68,.3);">
+      <div style="font-size:2.5rem;"></div><h2 style="color:var(--error);">NO VALID PASS</h2>
+      <p style="color:var(--muted);">No approved pass found for "<strong>${q}</strong>"</p>
+    </div>`;
+  }
+}
+
+function recordEntry(passId, studentName){
+  socket.emit('markAsUsed',{passId});
+  const hist = LS.get('sp_scanlog')||[];
+  hist.unshift({
+    passId, student: studentName,
+    guard: currentUser.username||currentUser.email,
+    time: new Date().toLocaleString('en-IN'),
+  });
+  LS.set('sp_scanlog', hist);
+
+  const out = document.getElementById('verifyOut');
+  if(out) out.innerHTML=`<div class="vr" style="background:rgba(99,102,241,.13);border:1px solid rgba(99,102,241,.3);">
+    <div style="font-size:2rem;"></div>
+    <h3 style="color:var(--accent2);margin-top:8px;">Entry Recorded</h3>
+    <p style="color:var(--muted);font-size:.88rem;">Pass marked as Used in the backend.</p>
+  </div>`;
+}
+
+function renderGuardHistory(el){
+  const hist = LS.get('sp_scanlog')||[];
+  el.innerHTML=`<div class="glass" style="overflow:hidden; max-width:800px;">
+    ${!hist.length
+      ? `<div style="padding:60px;text-align:center;color:var(--muted);">No scan history yet.</div>`
+      : `<div class="table-wrap"><table>
+          <thead><tr><th>Student</th><th>Time</th><th>Guard</th><th>Pass #</th></tr></thead>
+          <tbody>${hist.map(r=>`
+            <tr>
+              <td><strong>${r.student}</strong></td>
+              <td style="color:var(--muted);font-size:.85rem;">${r.time}</td>
+              <td style="color:var(--muted);">${r.guard}</td>
+              <td style="color:#64748b;font-size:.83rem;">#${r.passId}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table></div>`
+    }
+  </div>`;
+}
+
+function renderPrincipalOverview(el){
+  const total    = myPasses.length;
+  const approved = myPasses.filter(p=>p.status==='Approved').length;
+  const pending  = myPasses.filter(p=>p.status==='Pending').length;
+  const used     = myPasses.filter(p=>p.status==='Used').length;
+
+  el.innerHTML=`
+    ${noticeBannerHTML()}
+    <div class="stats-grid">
+      <div class="stat-card glass"><div class="label">Total Passes</div><div class="value">${total}</div></div>
+      <div class="stat-card glass"><div class="label">Approved</div><div class="value" style="color:var(--success);">${approved}</div></div>
+      <div class="stat-card glass"><div class="label">Pending</div><div class="value" style="color:var(--warning);">${pending}</div></div>
+      <div class="stat-card glass"><div class="label">Used / Scanned</div><div class="value" style="color:var(--accent);">${used}</div></div>
+    </div>
+    <div class="glass" style="padding:24px; margin-bottom:26px;">
+      <h3 style="margin-bottom:16px; font-size:1.1rem;">📡 Live System Status</h3>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;">
+        <div style="padding:16px;background:rgba(34,197,94,.1);border-radius:12px;border:1px solid rgba(34,197,94,.2);">
+          <p style="color:var(--muted);font-size:.82rem;">Backend Socket</p>
+          <p style="color:var(--success);font-weight:700;margin-top:4px;">🟢 Connected</p>
+        </div>
+        <div style="padding:16px;background:rgba(99,102,241,.1);border-radius:12px;border:1px solid rgba(99,102,241,.2);">
+          <p style="color:var(--muted);font-size:.82rem;">Real-time Sync</p>
+          <p style="color:var(--accent2);font-weight:700;margin-top:4px;">⚡ Active</p>
+        </div>
+        <div style="padding:16px;background:rgba(245,158,11,.1);border-radius:12px;border:1px solid rgba(245,158,11,.2);">
+          <p style="color:var(--muted);font-size:.82rem;">Database</p>
+          <p style="color:var(--warning);font-weight:700;margin-top:4px;">Database</p>
+        </div>
+      </div>
+    </div>
+    <div class="glass" style="overflow:hidden;">
+      <div style="padding:20px 24px;border-bottom:1px solid var(--border);">
+        <strong>Recent Passes</strong>
+      </div>
+      ${buildAllPassesTable(myPasses.slice(0,8))}
+    </div>`;
+}
+
+function renderAllPasses(el){
+  el.innerHTML=`
+    <div class="glass" style="overflow:hidden;">
+      <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+        <strong>All Gate Passes</strong>
+        <span style="color:var(--muted);font-size:.88rem;">${myPasses.length} total</span>
+      </div>
+      ${!myPasses.length
+        ? `<div style="padding:50px;text-align:center;color:var(--muted);">No passes in the system yet.</div>`
+        : buildAllPassesTable(myPasses)
+      }
+    </div>`;
+}
+
+function buildAllPassesTable(passes){
+  if(!passes.length) return `<div style="padding:30px;text-align:center;color:var(--muted);">No data</div>`;
+  return `<div class="table-wrap"><table>
+    <thead><tr><th>Student</th><th>Reason</th><th>Status</th><th>Created</th></tr></thead>
+    <tbody>${passes.map(p=>`
+      <tr>
+        <td><strong>${p.student}</strong></td>
+        <td style="color:var(--muted);">${p.reason}</td>
+        <td><span class="badge s-${p.status}">${p.status}</span></td>
+        <td style="font-size:.82rem;color:var(--muted);">${fmtDate(p.created_at)}</td>
+      </tr>`).join('')}
+    </tbody>
+  </table></div>`;
+}
+
+function renderActivity(el, label){
+  el.innerHTML=`
+    <div class="glass" style="padding:32px; max-width:820px;">
+      <h2 style="margin-bottom:8px;">${label} Activity</h2>
+      <p style="color:var(--muted);margin-bottom:26px;">Live updates from all ${label.toLowerCase()} sessions via Socket.IO</p>
+      <div class="info-box" style="margin-bottom:22px;">
+        ⚡ Any action taken in a ${label} portal is <strong>instantly reflected here</strong> through the backend's
+        <code>updatePasses</code> broadcast — no refresh needed.
+      </div>
+      ${buildAllPassesTable(myPasses.slice(0,5))}
+    </div>`;
+}
+
+function renderAdminHome(el){
+  const total    = myPasses.length;
+  const approved = myPasses.filter(p=>p.status==='Approved').length;
+  const pending  = myPasses.filter(p=>p.status==='Pending').length;
+  const teachers = allUsers.filter(u=>u.role==='teacher').length;
+  const students = allUsers.filter(u=>u.role==='student').length;
+  const guards   = allUsers.filter(u=>u.role==='guard').length;
+
+  el.innerHTML = `
+    ${noticeBannerHTML()}
+    <div class="info-box" style="margin-bottom:24px;">
+      <strong><i class="fas fa-user-shield"></i> Super Access:</strong>
+      As Admin you can view and act across every portal — Teacher, Student, Guard and Principal —
+      manage user accounts and employee IDs, and control the gate pass & security flow.
+    </div>
+    <div class="stats-grid">
+      <div class="stat-card glass"><div class="label">Total Users</div><div class="value">${allUsers.length}</div></div>
+      <div class="stat-card glass"><div class="label">Total Passes</div><div class="value">${total}</div></div>
+      <div class="stat-card glass"><div class="label">Approved</div><div class="value" style="color:var(--success);">${approved}</div></div>
+      <div class="stat-card glass"><div class="label">Pending</div><div class="value" style="color:var(--warning);">${pending}</div></div>
+    </div>
+    <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));">
+      <div class="mini-portal-card"><i class="fas fa-chalkboard-teacher" style="color:#6366f1;font-size:1.4rem;"></i><p style="margin-top:8px;font-weight:700;">${teachers}</p><p style="color:var(--muted);font-size:.8rem;">Teachers</p></div>
+      <div class="mini-portal-card"><i class="fas fa-user-graduate" style="color:#3b82f6;font-size:1.4rem;"></i><p style="margin-top:8px;font-weight:700;">${students}</p><p style="color:var(--muted);font-size:.8rem;">Students</p></div>
+      <div class="mini-portal-card"><i class="fas fa-shield-alt" style="color:#22c55e;font-size:1.4rem;"></i><p style="margin-top:8px;font-weight:700;">${guards}</p><p style="color:var(--muted);font-size:.8rem;">Guards</p></div>
+    </div>
+    <div class="glass" style="overflow:hidden; margin-top:10px;">
+      <div style="padding:20px 24px;border-bottom:1px solid var(--border);"><strong>Recent Pass Activity</strong></div>
+      ${buildAllPassesTable(myPasses.slice(0,8))}
+    </div>`;
+}
+
+function renderAdminMonitor(el){
+  const byRole = r => allUsers.filter(u=>u.role===r).length;
+  el.innerHTML = `
+    <div class="glass" style="padding:24px; margin-bottom:24px;">
+      <h3 style="margin-bottom:16px;">📡 Live Portal Access Monitor</h3>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;">
+        <div class="mini-portal-card" onclick="switchToPortal('teacher')" style="cursor:pointer;">
+          <i class="fas fa-chalkboard-teacher" style="color:#6366f1;"></i>
+          <p style="margin-top:6px;font-weight:700;">Teacher Portal</p>
+          <p style="color:var(--muted);font-size:.8rem;">${byRole('teacher')} accounts</p>
+        </div>
+        <div class="mini-portal-card" onclick="switchToPortal('student')" style="cursor:pointer;">
+          <i class="fas fa-user-graduate" style="color:#3b82f6;"></i>
+          <p style="margin-top:6px;font-weight:700;">Student Portal</p>
+          <p style="color:var(--muted);font-size:.8rem;">${byRole('student')} accounts</p>
+        </div>
+        <div class="mini-portal-card" onclick="switchToPortal('guard')" style="cursor:pointer;">
+          <i class="fas fa-shield-alt" style="color:#22c55e;"></i>
+          <p style="margin-top:6px;font-weight:700;">Guard Portal</p>
+          <p style="color:var(--muted);font-size:.8rem;">${byRole('guard')} accounts</p>
+        </div>
+        <div class="mini-portal-card" onclick="switchToPortal('principal')" style="cursor:pointer;">
+          <i class="fas fa-user-tie" style="color:#a855f7;"></i>
+          <p style="margin-top:6px;font-weight:700;">Principal Portal</p>
+          <p style="color:var(--muted);font-size:.8rem;">${byRole('principal')} accounts</p>
+        </div>
+        <div class="mini-portal-card" onclick="switchToPortal('admin')" style="cursor:pointer;">
+          <i class="fas fa-user-shield" style="color:#f59e0b;"></i>
+          <p style="margin-top:6px;font-weight:700;">Admin Portal</p>
+          <p style="color:var(--muted);font-size:.8rem;">${byRole('admin')} accounts</p>
+        </div>
+      </div>
+    </div>
+    <div class="glass" style="padding:24px; margin-bottom:24px;">
+      <h3 style="margin-bottom:16px;">👥 Currently Connected Users</h3>
+      <div id="liveUsersList" style="max-height:400px;overflow-y:auto;"></div>
+    </div>
+  `;
+  updateLiveUsers();
+}
+
+function updateLiveUsers() {
+  const container = document.getElementById('liveUsersList');
+  if (!container) return;
+
+  if (!onlineUsers || onlineUsers.length === 0) {
+    container.innerHTML = `<p style="color:var(--muted);text-align:center;padding:40px;">No users connected right now.</p>`;
+    return;
+  }
+
+  let html = `<table style="width:100%;border-collapse:collapse;"><thead><tr><th>User</th><th>Role</th><th>Connected Since</th></tr></thead><tbody>`;
+  onlineUsers.forEach(user => {
+    html += `
+      <tr>
+        <td><strong>${user.username || user.email}</strong></td>
+        <td><span class="role-pill role-${user.role}">${user.role}</span></td>
+        <td style="color:var(--muted);font-size:0.85rem;">${user.connectedAt ? new Date(user.connectedAt).toLocaleTimeString() : 'N/A'}</td>
+      </tr>`;
+  });
+  html += `</tbody></table>`;
+  container.innerHTML = html;
+}
+
+function renderLiveUsersPage(el){
+  el.innerHTML = `
+    <div class="glass" style="padding:24px; margin-bottom:24px;">
+      <h3 style="margin-bottom:16px;">👥 Currently Connected Users Across All Portals</h3>
+      <div id="liveUsersList" style="max-height:500px;overflow-y:auto;"></div>
+    </div>`;
+  updateLiveUsers();
+}
+
+// UPDATED: Only shows ACTIVE users. Removed users disappear completely from this view.
+function renderAdminUsers(el){
+  const activeUsers = allUsers.filter(u => u.is_active !== false);
+
+  el.innerHTML = `
+    <div class="glass" style="padding:22px 24px; margin-bottom:22px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+      <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+        <strong style="font-size:1.05rem;">User Directory</strong>
+        <select id="userPortalFilter" class="field" style="width:auto; margin:0; padding:8px 12px;" onchange="refreshDash()">
+          <option value="all">All Portals</option>
+          <option value="teacher">Teachers</option>
+          <option value="student">Students</option>
+          <option value="guard">Guards</option>
+          <option value="principal">Principals</option>
+          <option value="admin">Admins</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" style="width:auto; margin:0;" onclick="openAddUser()"><i class="fas fa-user-plus"></i> Add User</button>
+    </div>
+    <div class="glass" style="overflow:hidden;">
+      ${!activeUsers.length
+        ? `<div style="padding:50px;text-align:center;color:var(--muted);">No active users found.</div>`
+        : `<div class="table-wrap"><table>
+            <thead><tr><th>Employee ID</th><th>Name</th><th>Email</th><th>Role</th><th>Action</th></tr></thead>
+            <tbody>${(() => {
+                const filter = document.getElementById('userPortalFilter')?.value || 'all';
+                const filteredUsers = filter === 'all' ? activeUsers : activeUsers.filter(u => u.role === filter);
+                return filteredUsers.map(u=>`
+                  <tr>
+                    <td><span class="emp-id">${u.employee_id||u.employeeId||'—'}</span></td>
+                    <td><strong>${u.username||'—'}</strong></td>
+                    <td style="color:var(--muted);font-size:.85rem;">${u.email}</td>
+                    <td><span class="role-pill role-${u.role}">${u.role}</span></td>
+                    <td>
+                      ${u.role==='admin' && u.id===currentUser.id
+                        ? `<span style="color:var(--muted);font-size:.82rem;">You</span>`
+                        : `<button onclick="removeUser(${u.id},'${(u.username||u.email).replace(/'/g,"")}')"
+                                 style="padding:7px 14px;border-radius:10px;background:var(--error);color:#fff;border:none;cursor:pointer;font-weight:600;font-size:.82rem;">
+                             Remove
+                           </button>`
+                      }
+                    </td>
+                  </tr>`).join('');
+            })()}
+            </tbody>
+          </table></div>`
+      }
+    </div>`;
+}
+
+// NEW: Recycle Bin page for removed users
+function renderRecycleBin(el) {
+  el.innerHTML = `
+    <div class="glass" style="padding:22px 24px; margin-bottom:22px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+      <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+        <strong style="font-size:1.05rem;"><i class="fas fa-trash-restore"></i> Recycle Bin</strong>
+        <span style="color:var(--muted); font-size:.85rem;">${removedUsers.length} removed account(s)</span>
+      </div>
+    </div>
+    <div class="glass" style="overflow:hidden;">
+      ${!removedUsers.length
+        ? `<div style="padding:50px;text-align:center;color:var(--muted);">Recycle bin is empty. Removed users will appear here.</div>`
+        : `<div class="table-wrap"><table>
+            <thead><tr><th>Employee ID</th><th>Name</th><th>Email</th><th>Role</th><th>Actions</th></tr></thead>
+            <tbody>${removedUsers.map(u=>`
+              <tr>
+                <td><span class="emp-id">${u.employee_id||u.employeeId||'—'}</span></td>
+                <td><strong>${u.username||'—'}</strong></td>
+                <td style="color:var(--muted);font-size:.85rem;">${u.email}</td>
+                <td><span class="role-pill role-${u.role}">${u.role}</span></td>
+                <td style="display:flex; gap:8px;">
+                  <button onclick="restoreUser(${u.id},'${(u.username||u.email).replace(/'/g,"")}')"
+                          style="padding:7px 14px;border-radius:10px;background:var(--success);color:#fff;border:none;cursor:pointer;font-weight:600;font-size:.82rem;">
+                    <i class="fas fa-undo"></i> Restore
+                  </button>
+                  <button onclick="permanentlyDeleteUser(${u.id}, '${(u.username || u.email).replace(/'/g, "\\'")}')">
+
+                          style="padding:7px 14px;border-radius:10px;background:var(--error);color:#fff;border:none;cursor:pointer;font-weight:600;font-size:.82rem;">
+                    <i class="fas fa-trash"></i> Delete Permanently
+                  </button>
+                </td>
+              </tr>`).join('')}
+            </tbody>
+          </table></div>`
+      }
+    </div>`;
+}
+
+function renderAdminSecurity(el){
+  const pending = myPasses.filter(p=>p.status==='Pending').length;
+  const approved = myPasses.filter(p=>p.status==='Approved').length;
+  el.innerHTML = `
+    <div class="glass" style="padding:26px; margin-bottom:22px;">
+      <h3 style="margin-bottom:10px;">🔐 Gate Pass & Security Flow</h3>
+      <p style="color:var(--muted); font-size:.88rem; margin-bottom:20px;">
+        Admin-level controls that sit above the normal Teacher → Guard approval flow.
+      </p>
+      <div class="stats-grid" style="margin-bottom:0;">
+        <div class="stat-card glass"><div class="label">Pending Approvals</div><div class="value" style="color:var(--warning);">${pending}</div></div>
+        <div class="stat-card glass"><div class="label">Active Approved Passes</div><div class="value" style="color:var(--success);">${approved}</div></div>
+      </div>
+    </div>
+    <div class="glass" style="padding:26px; margin-bottom:22px;">
+      <h3 style="margin-bottom:14px;font-size:1rem;">Security Actions</h3>
+      <button class="btn btn-ghost" onclick="adminForceExpirePending()"><i class="fas fa-clock"></i> Force-Expire All Pending Passes</button>
+      <button class="btn btn-danger" onclick="adminLockdown()"><i class="fas fa-lock"></i> Trigger Campus Lockdown Alert</button>
+    </div>
+    <div class="glass" style="overflow:hidden;">
+      <div style="padding:20px 24px;border-bottom:1px solid var(--border);"><strong>All Gate Activity</strong></div>
+      ${buildAllPassesTable(myPasses)}
+    </div>`;
+}
+
+async function adminForceExpirePending(){
+  const ok = await confirm2('Force-Expire Pending Passes','This will mark every currently pending gate pass as expired. Continue?','⏱️');
+  if(!ok) return;
+  socket.emit('adminExpireAllPending');
+  toast('Requesting bulk expiry…','info');
+}
+
+async function adminLockdown(){
+  const ok = await confirm2('Trigger Lockdown Alert','This broadcasts an urgent security alert to every guard and the principal. Continue?','🚨');
+  if(!ok) return;
+  socket.emit('adminTriggerLockdown');
+  toast('Sending lockdown alert…','info');
+}
+
+function genEmployeeId(role){
+  const prefix = {teacher:'TCH', student:'STU', guard:'GRD', principal:'PRN', admin:'ADM'}[role] || 'EMP';
+  const num = Math.floor(1000 + Math.random()*9000);
+  return `${prefix}-${num}`;
+}
+
+function regenEmpId(){
+  const role = document.getElementById('au_role').value;
+  document.getElementById('au_empid').value = genEmployeeId(role);
+}
+
+function openAddUser(){
+  document.getElementById('au_name').value='';
+  document.getElementById('au_email').value='';
+  document.getElementById('au_pass').value='';
+  document.getElementById('au_role').value='teacher';
+  regenEmpId();
+  mOpen('mAddUser');
+}
+
+function submitAddUser(){
+  const username = document.getElementById('au_name').value.trim();
+  const email = document.getElementById('au_email').value.trim();
+  const password = document.getElementById('au_pass').value;
+  const role = document.getElementById('au_role').value;
+  const employeeId = document.getElementById('au_empid').value.trim();
+
+  if(!username || !email || !password) {
+    return toast('Name, email and password are required','error');
+  }
+  if(!socket?.connected) return toast('Not connected to the server','warning');
+
+  const submitBtn = document.querySelector('#mAddUser .btn-primary');
+  if(submitBtn) submitBtn.disabled = true;
+
+  socket.emit('adminCreateUser', {
+    username,
+    email,
+    password,
+    role,
+    employeeId
+  });
+
+  toast('Creating user...', 'info');
+}
+
+async function removeUser(userId, label){
+  const ok = await confirm2('Remove User', `Remove ${label}'s access to SmartPass Pro? This can be reversed by an admin later.`, '🗑️');
+  if(!ok) return;
+  // Emits soft-delete request to backend
+  socket.emit('adminDeleteUser', { id: userId });
+}
+
+// NEW: Restore user function
+async function restoreUser(userId, label){
+  const ok = await confirm2('Restore User', `Restore ${label}'s access to SmartPass Pro?`, '♻️');
+  if(!ok) return;
+  socket.emit('adminRestoreUser', { id: userId });
+}
+
+// NEW: Permanent delete function
+async function permanentlyDeleteUser(userId, label){
+  const ok = await confirm2('Permanently Delete User', `Permanently delete ${label}? This action CANNOT be undone.`, '⚠️');
+  if(!ok) return;
+  socket.emit('adminPermanentDeleteUser', { id: userId });
+}
+
+function renderProfile(el){
+  const u = currentUser;
+  el.innerHTML=`
+    <div class="glass" style="padding:36px; max-width:640px;">
+      <div style="display:flex;align-items:center;gap:22px;margin-bottom:30px;">
+        <img src="${document.getElementById('sbPhoto').src}"
+             style="width:84px;height:84px;border-radius:50%;border:4px solid var(--border);object-fit:cover;">
+        <div>
+          <h2 style="font-size:1.6rem;">${u.username||'N/A'}</h2>
+          <p style="color:var(--accent2);margin-top:4px;text-transform:capitalize;">${u.role}</p>
+        </div>
+      </div>
+      ${pRow('Email', u.email)}
+      ${pRow('Role', u.role?.charAt(0).toUpperCase()+u.role?.slice(1))}
+      ${u.employeeId?pRow('Employee ID', `<span class="emp-id">${u.employeeId}</span>`):''}
+      ${u.institute?pRow('Institute', u.institute):''}
+      ${pRow('User ID', '#'+u.id)}
+      ${pRow('Status','<span style="color:var(--success);">● Active</span>')}
+    </div>`;
+}
+
+function switchToPortal(role) {
+  if (!currentUser || currentUser.role !== 'admin') {
+    return toast("Only Admin can switch portals", "error");
+  }
+
+  _authRole = role;
+  document.getElementById('pageDash').classList.remove('open');
+  document.getElementById('pageLanding').style.display = 'none';
+  goAuth();
+  toast(`Switched to ${role} portal`, "info");
+}
+
+function pRow(lbl,val){
+  return `<div class="p-row"><span class="p-label">${lbl}</span><span class="p-val">${val}</span></div>`;
+}
+
+function sendForgotCode(){
+  const email = document.getElementById('forgotEmail').value.trim();
+  if(!email) return toast('Enter your email','error');
+  if(!socket?.connected) return toast('Not connected to server yet — please wait', 'warning');
+
+  _forgotEmail = email;
+  socket.emit('sendOTP', { email, purpose: 'password_reset' });
+  toast('Sending security code…', 'info');
+}
+
+function verifySecCode(){
+  const code = document.getElementById('secCodeInput').value.trim();
+  if(!/^\d{6}$/.test(code)) return toast('Enter the 6-digit security code','error');
+  if(!socket?.connected) return toast('Not connected to server', 'error');
+
+  window._pendingResetOtp = code;
+  socket.emit('verifyResetOTP', { email: _forgotEmail, otp: code });
+  toast('Verifying code...', 'info');
+}
+
+function doResetPass(){
+  const p1 = document.getElementById('newPass1').value;
+  const p2 = document.getElementById('newPass2').value;
+  const otp = window._pendingResetOtp;
+
+  if(p1.length < 8) return toast('Password must be at least 8 characters','error');
+  if(p1 !== p2) return toast('Passwords do not match','error');
+
+  if(!_forgotEmail || !otp) {
+    toast('Session expired. Please request a new code.', 'error');
+    mClose('mResetPass');
+    return;
+  }
+
+  socket.emit('resetPassword', {
+    email: _forgotEmail,
+    otp: otp,
+    newPassword: p1
+  });
+
+  toast('Updating password...', 'info');
+}
+
+function fmtDate(dt){ if(!dt) return 'N/A'; return new Date(dt).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}); }
+
+function changePhoto(e){
+  const reader=new FileReader();
+  reader.onload=()=>{
+    const src=reader.result;
+    document.getElementById('sbPhoto').src=src;
+    if(currentUser) LS.set(`sp_photo_${currentUser.id}`,src);
+    toast('Profile photo updated','success');
+  };
+  reader.readAsDataURL(e.target.files[0]);
+}
+
+function toggleTheme(){ document.body.classList.toggle('light'); toast('Theme switched','success'); }
+
+function toggleSB(){
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('sbOverlay').classList.toggle('open');
+}
+
+function closeSB(){
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sbOverlay').classList.remove('open');
+}
+
+function exportPDF(){
+  try{
+    const {jsPDF}=window.jspdf;
+    const doc=new jsPDF();
+    const u=currentUser;
+    doc.setFontSize(22); doc.text('SmartPass Pro — Report',20,24);
+    doc.setFontSize(12);
+    doc.text(`Portal: ${u.role?.toUpperCase()}`,20,40);
+    doc.text(`User: ${u.username||u.email}`,20,52);
+    doc.text(`Total Passes: ${myPasses.length}`,20,64);
+    doc.text(`Approved: ${myPasses.filter(p=>p.status==='Approved').length}`,20,76);
+    doc.text(`Pending:  ${myPasses.filter(p=>p.status==='Pending').length}`,20,88);
+    doc.text(`Generated: ${new Date().toLocaleString('en-IN')}`,20,100);
+    myPasses.slice(0,20).forEach((p,i)=>{
+      doc.text(`${i+1}. ${p.student} — ${p.reason} [${p.status}]`,20,116+(i*10));
+    });
+    doc.save(`SmartPass_${u.role}_${Date.now()}.pdf`);
+    toast('PDF downloaded!','success');
+  } catch(err){ toast('PDF export failed','error'); }
+}
+
+function doLogoutImmediate(){
+  currentUser=null; myPasses=[]; allUsers=[]; removedUsers=[];
+  stopTokenRefreshLoop();
+  LS.del('sp_user'); LS.del('sp_token'); LS.del('sp_refresh'); LS.del('sp_pending_portal');
+  if(mainChart){ mainChart.destroy(); mainChart=null; }
+  if(socket){ socket.auth = (cb)=>cb({ token: null }); }
+  document.getElementById('pageDash').classList.remove('open');
+  document.getElementById('pageLanding').style.display='';
+}
+
+async function doLogout(){
+  const ok=await confirm2('Logout','Are you sure you want to log out?','⏻');
+  if(!ok) return;
+  doLogoutImmediate();
+  toast('Logged out','info');
+}
+
+window.addEventListener('DOMContentLoaded',()=>{
+  setTimeout(() => {
+    const splash = document.getElementById('splashScreen');
+    if (splash) {
+      splash.style.opacity = '0';
+      setTimeout(() => { splash.style.display = 'none'; }, 1500);
+    }
+  }, 2800);
+
+  initSocket();
+
+  const saved=LS.get('sp_user');
+  const savedToken = LS.get('sp_token');
+  if(saved && saved.id && saved.role && savedToken){
+    currentUser=saved;
+    _authRole=saved.role;
+    document.getElementById('pageLanding').style.display='none';
+    startTokenRefreshLoop();
+    goDash();
+    toast('Session restored — syncing data…','info');
+  }
+});
+</script>
+</body>
+</html>
